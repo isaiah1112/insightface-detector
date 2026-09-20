@@ -1,7 +1,8 @@
-import argparse
 import glob
 import json
 import os
+
+import click
 
 from .detector import InsightFaceDetector
 from .visualize import save_face_images
@@ -22,130 +23,144 @@ def collect_images(path):
     raise ValueError(f"Input path is neither a file nor directory: {path}")
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="InsightFace-based face detection"
-    )
-    parser.add_argument("image", help="Path to input image or directory")
+def _process_image(detector, img_path, *, target_embedding, min_score, match_threshold, sort_by, max_faces):
+    faces = detector.detect(img_path)
+    faces = [face for face in faces if face["score"] >= min_score]
 
-    parser.add_argument(
-        "-o", "--output",
-        help="Directory to save detected face images",
-        default=None
-    )
+    if target_embedding is not None:
+        faces = detector.filter_by_similarity(
+            faces,
+            target_embedding,
+            threshold=match_threshold,
+        )
 
-    parser.add_argument(
-        "-f", "--image-format",
-        help="Image format for saved faces (jpg, png, bmp, tiff)",
-        default="jpg"
-    )
+    if sort_by == "score":
+        faces.sort(key=lambda face: face["score"], reverse=True)
+    elif sort_by == "similarity":
+        faces.sort(key=lambda face: face.get("similarity", 0.0), reverse=True)
 
-    parser.add_argument(
-        "-p", "--padding",
-        type=int,
-        help="Padding around each face crop in pixels",
-        default=250
-    )
+    if max_faces is not None:
+        faces = faces[:max_faces]
 
-    parser.add_argument(
-        "--min-score",
-        type=float,
-        help="Minimum detection confidence score (0.0–1.0)",
-        default=0.0
-    )
+    return faces
 
-    parser.add_argument(
-        "--target-face",
-        help="Path to an image containing the face to match",
-        default=None
-    )
 
-    parser.add_argument(
-        "--match-threshold",
-        type=float,
-        help="Cosine similarity threshold for target face matching",
-        default=0.45
-    )
-
-    parser.add_argument(
-        "-j", "--output-json",
-        help="Path to save JSON results",
-        default=None
-    )
-    
-    parser.add_argument(
-        "--sort-by",
-        choices=["score", "similarity"],
-        help="Sort detected faces by score or similarity",
-        default=None
-    )
-
-    parser.add_argument(
-        "--max-faces",
-        type=int,
-        help="Maximum number of faces to keep per image after sorting",
-        default=1
-    )
-
-    args = parser.parse_args()
-
-    # Collect input images (file or directory)
-    input_images = collect_images(args.image)
+@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+@click.version_option(package_name="insightface-detector", prog_name="insightface-detect")
+@click.argument("image", type=click.Path(exists=True, readable=True, path_type=str))
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(file_okay=False, path_type=str),
+    default=None,
+    help="Directory to save detected face images.",
+)
+@click.option(
+    "-f",
+    "--image-format",
+    type=click.Choice(["jpg", "png", "bmp", "tiff"], case_sensitive=False),
+    default="jpg",
+    show_default=True,
+    help="Image format for saved faces.",
+)
+@click.option(
+    "-p",
+    "--padding",
+    type=click.IntRange(min=0),
+    default=250,
+    show_default=True,
+    help="Padding around each face crop in pixels.",
+)
+@click.option(
+    "--min-score",
+    type=click.FloatRange(0.0, 1.0),
+    default=0.0,
+    show_default=True,
+    help="Minimum detection confidence score (0.0–1.0).",
+)
+@click.option(
+    "--target-face",
+    type=click.Path(exists=True, readable=True, path_type=str),
+    default=None,
+    help="Path to a reference face image to match.",
+)
+@click.option(
+    "--match-threshold",
+    type=click.FloatRange(0.0, 1.0),
+    default=0.45,
+    show_default=True,
+    help="Cosine similarity threshold for target face matching.",
+)
+@click.option(
+    "-j",
+    "--output-json",
+    type=click.Path(dir_okay=False, path_type=str),
+    default=None,
+    help="Path to save JSON results.",
+)
+@click.option(
+    "--sort-by",
+    type=click.Choice(["score", "similarity"], case_sensitive=False),
+    default=None,
+    help="Sort detected faces by score or similarity.",
+)
+@click.option(
+    "--max-faces",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    help="Maximum number of faces to keep per image after sorting.",
+)
+def main(
+    image,
+    output,
+    image_format,
+    padding,
+    min_score,
+    target_face,
+    match_threshold,
+    output_json,
+    sort_by,
+    max_faces,
+):
+    """InsightFace-based face detection."""
+    input_images = collect_images(image)
     if not input_images:
-        raise ValueError("No images found in input path.")
+        raise click.ClickException("No images found in input path.")
 
     detector = InsightFaceDetector()
-
-    # Load target face embedding if provided
-    target_embedding = None
-    if args.target_face:
-        target_embedding = detector.get_embedding(args.target_face)
-
+    target_embedding = detector.get_embedding(target_face) if target_face else None
     all_results = {}
 
     for img_path in input_images:
-        faces = detector.detect(img_path)
-
-        # Filter by score
-        faces = [f for f in faces if f["score"] >= args.min_score]
-
-        # Filter by target face similarity
-        if target_embedding is not None:
-            faces = detector.filter_by_similarity(
-                faces,
-                target_embedding,
-                threshold=args.match_threshold
-            )
-
-        # Sort faces if requested
-        if args.sort_by == "score":
-            faces.sort(key=lambda f: f["score"], reverse=True)
-
-        elif args.sort_by == "similarity":
-            faces.sort(key=lambda f: f.get("similarity", 0.0), reverse=True)
-            
-        # Apply max-faces limit
-        if args.max_faces is not None:
-            faces = faces[:args.max_faces]
-
+        faces = _process_image(
+            detector,
+            img_path,
+            target_embedding=target_embedding,
+            min_score=min_score,
+            match_threshold=match_threshold,
+            sort_by=sort_by,
+            max_faces=max_faces,
+        )
         all_results[img_path] = faces
 
-        # Save face crops
-        if args.output:
-            os.makedirs(args.output, exist_ok=True)
+        if output:
+            os.makedirs(output, exist_ok=True)
             save_face_images(
                 image_path=img_path,
                 faces=faces,
-                output_dir=args.output,
-                image_format=args.image_format,
-                padding=args.padding,
+                output_dir=output,
+                image_format=image_format,
+                padding=padding,
             )
 
-    # Save JSON summary
-    if args.output_json:
-        with open(args.output_json, "w") as f:
+    if output_json:
+        with open(output_json, "w") as f:
             json.dump(all_results, f, indent=2)
 
-    # If no output flags, print JSON to stdout
-    if not args.output and not args.output_json:
-        print(json.dumps(all_results, indent=2))
+    if not output and not output_json:
+        click.echo(json.dumps(all_results, indent=2))
+
+
+if __name__ == "__main__":
+    main()

@@ -8,6 +8,7 @@ dependencies = [
     "onnxruntime>=1.17.0",
     "opencv-python-headless>=4.9.0.0",
     "numpy>=1.24.0",
+    "click>=8.5.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -15,6 +16,11 @@ where = ["src"]
 
 [tool.uv]
 package = true
+
+[dependency-groups]
+test = [
+    "pytest>=9.1.1",
+]
 
 [project.scripts]
 insightface-detect = "insightface_detector.cli:main"
