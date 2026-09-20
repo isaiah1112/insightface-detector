@@ -38,6 +38,19 @@ def main():
     )
 
     parser.add_argument(
+        "--target-face",
+        help="Path to an image containing the face to match",
+        default=None
+    )
+
+    parser.add_argument(
+        "--match-threshold",
+        type=float,
+        help="Cosine similarity threshold for target face matching",
+        default=0.45
+    )
+
+    parser.add_argument(
         "-j", "--output-json",
         help="Path to save JSON results",
         default=None
@@ -46,17 +59,28 @@ def main():
     args = parser.parse_args()
 
     detector = InsightFaceDetector()
+
+    # Detect faces in main image
     faces = detector.detect(args.image)
 
-    # Apply score filtering
+    # Filter by score
     faces = [f for f in faces if f["score"] >= args.min_score]
 
-    # Save JSON if requested
+    # If target face is provided, filter by similarity
+    if args.target_face:
+        target_embedding = detector.get_embedding(args.target_face)
+        faces = detector.filter_by_similarity(
+            faces,
+            target_embedding,
+            threshold=args.match_threshold
+        )
+
+    # Save JSON
     if args.output_json:
         with open(args.output_json, "w") as f:
             json.dump(faces, f, indent=2)
 
-    # Save face crops if requested
+    # Save face crops
     if args.output:
         os.makedirs(args.output, exist_ok=True)
         save_face_images(
@@ -67,6 +91,6 @@ def main():
             padding=args.padding,
         )
 
-    # If no output flags, print JSON to stdout
+    # Default: print JSON
     if not args.output and not args.output_json:
         print(json.dumps(faces, indent=2))
