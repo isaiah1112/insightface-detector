@@ -1,28 +1,24 @@
 import cv2
 import os
 
-VALID_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tiff"}
+VALID_EXTS = {"jpg", "jpeg", "png", "bmp", "tiff"}
 
-def ensure_extension(path):
-    root, ext = os.path.splitext(path)
-    if ext.lower() in VALID_EXTS:
-        return path
-    return root + ".jpg"   # default fallback
 
-def draw_faces(image_path, faces, output_path=None):
+def save_face_images(image_path, faces, output_dir, image_format="jpg"):
+    if image_format.lower() not in VALID_EXTS:
+        raise ValueError(f"Invalid image format: {image_format}")
+
     img = cv2.imread(image_path)
     if img is None:
         raise ValueError(f"Could not read image: {image_path}")
 
-    for face in faces:
+    base = os.path.splitext(os.path.basename(image_path))[0]
+
+    for idx, face in enumerate(faces):
         x1, y1, x2, y2 = face["bbox"]
-        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        crop = img[y1:y2, x1:x2]
 
-        for lx, ly in face["landmarks"]:
-            cv2.circle(img, (int(lx), int(ly)), 2, (0, 0, 255), -1)
+        filename = f"{base}_face_{idx}.{image_format}"
+        path = os.path.join(output_dir, filename)
 
-    if output_path:
-        output_path = ensure_extension(output_path)
-        cv2.imwrite(output_path, img)
-
-    return img
+        cv2.imwrite(path, crop)

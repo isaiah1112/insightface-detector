@@ -24,11 +24,17 @@ class InsightFaceDetector:
         for face in faces:
             bbox = face.bbox.astype(int).tolist()
 
-            # Handle missing landmarks safely
-            if face.landmark_2d is not None:
-                landmarks = face.landmark_2d.tolist()
-            else:
-                landmarks = []  # or None, depending on your downstream needs
+            landmarks = (
+                face.landmark_2d.tolist()
+                if face.landmark_2d is not None
+                else []
+            )
+
+            embedding = (
+                face.embedding.tolist()
+                if face.embedding is not None
+                else None
+            )
 
             results.append({
                 "bbox": bbox,
@@ -36,8 +42,7 @@ class InsightFaceDetector:
                 "score": float(face.det_score),
                 "age": int(face.age) if face.age is not None else None,
                 "gender": int(face.gender) if face.gender is not None else None,
-                "embedding": face.embedding.tolist() if face.embedding is not None else None,
+                "embedding": embedding,
             })
 
         return results
-
