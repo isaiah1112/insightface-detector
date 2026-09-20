@@ -79,6 +79,12 @@ def main():
         default=None
     )
 
+    parser.add_argument(
+        "--max-faces",
+        type=int,
+        help="Maximum number of faces to keep per image after sorting",
+        default=1
+    )
 
     args = parser.parse_args()
 
@@ -116,6 +122,10 @@ def main():
 
         elif args.sort_by == "similarity":
             faces.sort(key=lambda f: f.get("similarity", 0.0), reverse=True)
+            
+        # Apply max-faces limit
+        if args.max_faces is not None:
+            faces = faces[:args.max_faces]
 
         all_results[img_path] = faces
 
