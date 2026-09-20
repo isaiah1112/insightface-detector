@@ -4,7 +4,7 @@ import os
 VALID_EXTS = {"jpg", "jpeg", "png", "bmp", "tiff"}
 
 
-def save_face_images(image_path, faces, output_dir, image_format="jpg"):
+def save_face_images(image_path, faces, output_dir, image_format="jpg", padding=0):
     if image_format.lower() not in VALID_EXTS:
         raise ValueError(f"Invalid image format: {image_format}")
 
@@ -12,11 +12,19 @@ def save_face_images(image_path, faces, output_dir, image_format="jpg"):
     if img is None:
         raise ValueError(f"Could not read image: {image_path}")
 
+    height, width = img.shape[:2]
     base = os.path.splitext(os.path.basename(image_path))[0]
 
     for idx, face in enumerate(faces):
         x1, y1, x2, y2 = face["bbox"]
-        crop = img[y1:y2, x1:x2]
+
+        # Apply padding safely
+        x1p = max(0, x1 - padding)
+        y1p = max(0, y1 - padding)
+        x2p = min(width, x2 + padding)
+        y2p = min(height, y2 + padding)
+
+        crop = img[y1p:y2p, x1p:x2p]
 
         filename = f"{base}_face_{idx}.{image_format}"
         path = os.path.join(output_dir, filename)

@@ -24,6 +24,13 @@ def main():
     )
 
     parser.add_argument(
+        "-p", "--padding",
+        type=int,
+        help="Padding around each face crop in pixels",
+        default=250
+    )
+
+    parser.add_argument(
         "-j", "--output-json",
         help="Path to save JSON results",
         default=None
@@ -47,6 +54,7 @@ def main():
             faces=faces,
             output_dir=args.output,
             image_format=args.image_format,
+            padding=args.padding,
         )
 
     # If no output flags, print JSON to stdout
