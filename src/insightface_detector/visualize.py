@@ -26,7 +26,13 @@ def save_face_images(image_path, faces, output_dir, image_format="jpg", padding=
 
         crop = img[y1p:y2p, x1p:x2p]
 
-        filename = f"{base}_face_{idx}.{image_format}"
-        path = os.path.join(output_dir, filename)
+        score = face.get("score", 0.0)
+        sim = face.get("similarity", None)
 
+        if sim is not None:
+            filename = f"{base}_face_{idx}_score-{score:.3f}_sim-{sim:.3f}.{image_format}"
+        else:
+            filename = f"{base}_face_{idx}_score-{score:.3f}.{image_format}"
+
+        path = os.path.join(output_dir, filename)
         cv2.imwrite(path, crop)

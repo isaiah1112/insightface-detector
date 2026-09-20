@@ -71,6 +71,14 @@ def main():
         help="Path to save JSON results",
         default=None
     )
+    
+    parser.add_argument(
+        "--sort-by",
+        choices=["score", "similarity"],
+        help="Sort detected faces by score or similarity",
+        default=None
+    )
+
 
     args = parser.parse_args()
 
@@ -101,6 +109,13 @@ def main():
                 target_embedding,
                 threshold=args.match_threshold
             )
+
+        # Sort faces if requested
+        if args.sort_by == "score":
+            faces.sort(key=lambda f: f["score"], reverse=True)
+
+        elif args.sort_by == "similarity":
+            faces.sort(key=lambda f: f.get("similarity", 0.0), reverse=True)
 
         all_results[img_path] = faces
 
