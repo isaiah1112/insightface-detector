@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 from insightface.app import FaceAnalysis
 
-
 try:
     from insightface.utils.face_align import norm_crop
 except ImportError:  # pragma: no cover - optional module not available in some installs

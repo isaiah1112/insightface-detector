@@ -1,5 +1,6 @@
-import cv2
 import os
+
+import cv2
 
 VALID_EXTS = {"jpg", "jpeg", "png", "bmp", "tiff"}
 

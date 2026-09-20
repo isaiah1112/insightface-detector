@@ -1,7 +1,8 @@
 import argparse
+import glob
 import json
 import os
-import glob
+
 from .detector import InsightFaceDetector
 from .visualize import save_face_images
 
