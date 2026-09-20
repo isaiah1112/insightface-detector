@@ -31,6 +31,13 @@ def main():
     )
 
     parser.add_argument(
+        "--min-score",
+        type=float,
+        help="Minimum detection confidence score (0.0–1.0)",
+        default=0.0
+    )
+
+    parser.add_argument(
         "-j", "--output-json",
         help="Path to save JSON results",
         default=None
@@ -40,6 +47,9 @@ def main():
 
     detector = InsightFaceDetector()
     faces = detector.detect(args.image)
+
+    # Apply score filtering
+    faces = [f for f in faces if f["score"] >= args.min_score]
 
     # Save JSON if requested
     if args.output_json:
