@@ -1,15 +1,31 @@
 import argparse
 import json
 import os
+import glob
 from .detector import InsightFaceDetector
 from .visualize import save_face_images
+
+
+def collect_images(path):
+    """Return a list of image paths from a file or directory."""
+    if os.path.isfile(path):
+        return [path]
+
+    if os.path.isdir(path):
+        exts = ("*.jpg", "*.jpeg", "*.png", "*.bmp", "*.tiff")
+        images = []
+        for ext in exts:
+            images.extend(glob.glob(os.path.join(path, ext)))
+        return sorted(images)
+
+    raise ValueError(f"Input path is neither a file nor directory: {path}")
 
 
 def main():
     parser = argparse.ArgumentParser(
         description="InsightFace-based face detection"
     )
-    parser.add_argument("image", help="Path to input image")
+    parser.add_argument("image", help="Path to input image or directory")
 
     parser.add_argument(
         "-o", "--output",
@@ -58,39 +74,52 @@ def main():
 
     args = parser.parse_args()
 
+    # Collect input images (file or directory)
+    input_images = collect_images(args.image)
+    if not input_images:
+        raise ValueError("No images found in input path.")
+
     detector = InsightFaceDetector()
 
-    # Detect faces in main image
-    faces = detector.detect(args.image)
-
-    # Filter by score
-    faces = [f for f in faces if f["score"] >= args.min_score]
-
-    # If target face is provided, filter by similarity
+    # Load target face embedding if provided
+    target_embedding = None
     if args.target_face:
         target_embedding = detector.get_embedding(args.target_face)
-        faces = detector.filter_by_similarity(
-            faces,
-            target_embedding,
-            threshold=args.match_threshold
-        )
 
-    # Save JSON
+    all_results = {}
+
+    for img_path in input_images:
+        faces = detector.detect(img_path)
+
+        # Filter by score
+        faces = [f for f in faces if f["score"] >= args.min_score]
+
+        # Filter by target face similarity
+        if target_embedding is not None:
+            faces = detector.filter_by_similarity(
+                faces,
+                target_embedding,
+                threshold=args.match_threshold
+            )
+
+        all_results[img_path] = faces
+
+        # Save face crops
+        if args.output:
+            os.makedirs(args.output, exist_ok=True)
+            save_face_images(
+                image_path=img_path,
+                faces=faces,
+                output_dir=args.output,
+                image_format=args.image_format,
+                padding=args.padding,
+            )
+
+    # Save JSON summary
     if args.output_json:
         with open(args.output_json, "w") as f:
-            json.dump(faces, f, indent=2)
+            json.dump(all_results, f, indent=2)
 
-    # Save face crops
-    if args.output:
-        os.makedirs(args.output, exist_ok=True)
-        save_face_images(
-            image_path=args.image,
-            faces=faces,
-            output_dir=args.output,
-            image_format=args.image_format,
-            padding=args.padding,
-        )
-
-    # Default: print JSON
+    # If no output flags, print JSON to stdout
     if not args.output and not args.output_json:
-        print(json.dumps(faces, indent=2))
+        print(json.dumps(all_results, indent=2))
