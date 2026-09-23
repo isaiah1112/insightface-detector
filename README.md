@@ -17,6 +17,16 @@ This project detects faces in one image or a directory of images, optionally fil
 
 ## Installation
 
+### Using uv (recommended)
+
+```bash
+uv sync
+```
+
+This creates the project environment and installs dependencies from the project configuration.
+
+### Using pip
+
 ```bash
 pip install -e .
 ```
@@ -128,8 +138,16 @@ Notes:
 
 ## Development
 
+### Run tests with uv
+
 ```bash
-pytest
+uv run pytest -q
+```
+
+### Run the CLI with uv
+
+```bash
+uv run insightface-detect --help
 ```
 
 The project currently includes a small CLI test suite to validate the command interface and version output.
