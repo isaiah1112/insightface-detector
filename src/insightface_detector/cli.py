@@ -132,27 +132,28 @@ def main(
     target_embedding = detector.get_embedding(target_face) if target_face else None
     all_results = {}
 
-    for img_path in input_images:
-        faces = _process_image(
-            detector,
-            img_path,
-            target_embedding=target_embedding,
-            min_score=min_score,
-            match_threshold=match_threshold,
-            sort_by=sort_by,
-            max_faces=max_faces,
-        )
-        all_results[img_path] = faces
-
-        if output:
-            os.makedirs(output, exist_ok=True)
-            save_face_images(
-                image_path=img_path,
-                faces=faces,
-                output_dir=output,
-                image_format=image_format,
-                padding=padding,
+    with click.progressbar(input_images, label="Processing images") as bar:
+        for img_path in bar:
+            faces = _process_image(
+                detector,
+                img_path,
+                target_embedding=target_embedding,
+                min_score=min_score,
+                match_threshold=match_threshold,
+                sort_by=sort_by,
+                max_faces=max_faces,
             )
+            all_results[img_path] = faces
+
+            if output:
+                os.makedirs(output, exist_ok=True)
+                save_face_images(
+                    image_path=img_path,
+                    faces=faces,
+                    output_dir=output,
+                    image_format=image_format,
+                    padding=padding,
+                )
 
     if output_json:
         with open(output_json, "w") as f:
