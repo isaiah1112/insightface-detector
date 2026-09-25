@@ -8,19 +8,41 @@ from .detector import InsightFaceDetector
 from .visualize import save_face_images
 
 
-def collect_images(path):
-    """Return a list of image paths from a file or directory."""
-    if os.path.isfile(path):
-        return [path]
+def collect_images(paths):
+    """Return a list of image paths from one or many files/directories."""
+    if isinstance(paths, (str, os.PathLike)):
+        paths = [os.fspath(paths)]
 
-    if os.path.isdir(path):
-        exts = ("*.jpg", "*.jpeg", "*.png", "*.bmp", "*.tiff")
-        images = []
-        for ext in exts:
-            images.extend(glob.glob(os.path.join(path, ext)))
-        return sorted(images)
+    supported_exts = ("*.jpg", "*.jpeg", "*.png", "*.bmp", "*.tiff")
+    images = []
+    seen = set()
 
-    raise ValueError(f"Input path is neither a file nor directory: {path}")
+    for raw_path in paths:
+        path = os.fspath(raw_path)
+
+        if glob.has_magic(path):
+            matches = sorted(glob.glob(path))
+            if not matches:
+                raise ValueError(f"No images matched the glob pattern: {path}")
+            for match in matches:
+                images.extend(collect_images([match]))
+            continue
+
+        if os.path.isfile(path):
+            candidates = [path]
+        elif os.path.isdir(path):
+            candidates = []
+            for ext in supported_exts:
+                candidates.extend(glob.glob(os.path.join(path, ext)))
+        else:
+            raise ValueError(f"Input path is neither a file nor directory: {path}")
+
+        for candidate in sorted(candidates):
+            if candidate not in seen:
+                seen.add(candidate)
+                images.append(candidate)
+
+    return sorted(images)
 
 
 def _process_image(detector, img_path, *, target_embedding, min_score, match_threshold, sort_by, max_faces):
@@ -47,7 +69,7 @@ def _process_image(detector, img_path, *, target_embedding, min_score, match_thr
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.version_option(package_name="insightface-detector", prog_name="insightface-detect")
-@click.argument("image", type=click.Path(exists=True, readable=True, path_type=str))
+@click.argument("image", nargs=-1, type=click.Path(exists=True, readable=True, path_type=str))
 @click.option(
     "-o",
     "--output",
